@@ -1,6 +1,6 @@
 import React, {useEffect, useState} from 'react';
 import {collection, query, where, getDocs, onSnapshot, orderBy} from 'firebase/firestore';
-import {db, auth, handleFirestoreError, OperationType} from '../lib/firebase';
+import {db, auth, handleFirestoreError, OperationType, getEffectiveUid} from '../lib/firebase';
 import {VocabularyWord} from '../types';
 import {BookOpen, Brain, Trophy, ChevronRight, Volume2} from 'lucide-react';
 import {playPronunciation} from '../lib/pronounce';
@@ -17,9 +17,9 @@ export function ReviewList({ onStartReview, words: propWords, loading: propLoadi
 
   useEffect(() => {
     if (propWords !== undefined) return;
-    if (!auth.currentUser) return;
+    const userId = getEffectiveUid();
+    if (!userId) return;
 
-    const userId = auth.currentUser.uid;
     const q = query(
       collection(db, `users/${userId}/vocabulary`),
       orderBy('createdAt', 'desc')

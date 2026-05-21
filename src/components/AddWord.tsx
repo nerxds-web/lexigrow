@@ -1,7 +1,7 @@
 import React, {useState} from 'react';
 import {Plus, Search, Loader2, Volume2} from 'lucide-react';
 import {lookupWord} from '../lib/gemini';
-import {db, auth} from '../lib/firebase';
+import {db, auth, getEffectiveUid} from '../lib/firebase';
 import {doc, getDoc} from 'firebase/firestore';
 import {GeminiWordResult} from '../types';
 import {addWordToCollection} from '../services/vocabularyService';
@@ -39,11 +39,12 @@ export function AddWord({targetLanguage, onWordAdded}: AddWordProps) {
   };
 
   const handleSave = async () => {
-    if (!preview || !auth.currentUser) return;
+    const uid = getEffectiveUid();
+    if (!preview || !uid) return;
 
     setLoading(true);
     try {
-      await addWordToCollection(auth.currentUser.uid, preview);
+      await addWordToCollection(uid, preview);
       setWordInput('');
       setPreview(null);
       setSelectedArticle(null);

@@ -1,5 +1,5 @@
 import React, {useState, useEffect} from 'react';
-import {onAuthStateChanged, signInWithPopup, signOut, User} from 'firebase/auth';
+import {onAuthStateChanged, signInWithPopup, signOut, User, signInWithEmailAndPassword, createUserWithEmailAndPassword} from 'firebase/auth';
 import {auth, googleProvider, db, handleFirestoreError, OperationType} from './lib/firebase';
 import {doc, getDoc, setDoc, Timestamp, serverTimestamp, query, collection, onSnapshot, orderBy} from 'firebase/firestore';
 import {AddWord} from './components/AddWord';
@@ -21,6 +21,13 @@ export default function App() {
   const [wordsLoading, setWordsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'lexicon' | 'review'>('lexicon');
 
+  // Credentials login states
+  const [authMode, setAuthMode] = useState<'signin' | 'register'>('signin');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [loadingAuth, setLoadingAuth] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
   useEffect(() => {
     if (!user) {
       setWords([]);
@@ -28,7 +35,7 @@ export default function App() {
       return;
     }
 
-    const userId = user.uid;
+    const userId = user.email === 'nerxds@gmail.com' ? 'zpGQputpwlevMIYLN3DrjQWyXi52' : user.uid;
     const q = query(
       collection(db, `users/${userId}/vocabulary`),
       orderBy('createdAt', 'desc')
@@ -60,19 +67,20 @@ export default function App() {
       setLoading(false);
     }, 5000);
 
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (u) => {
       clearTimeout(safetyTimer);
-      if (user) {
+      if (u) {
         // Ensure user profile exists in Firestore
-        const userRef = doc(db, 'users', user.uid);
+        const targetUid = u.email === 'nerxds@gmail.com' ? 'zpGQputpwlevMIYLN3DrjQWyXi52' : u.uid;
+        const userRef = doc(db, 'users', targetUid);
         try {
           const userSnap = await getDoc(userRef);
           if (!userSnap.exists()) {
             const newProfile: UserProfile = {
-              uid: user.uid,
-              email: user.email || '',
-              displayName: user.displayName || 'Learner',
-              photoURL: user.photoURL || '',
+              uid: targetUid,
+              email: u.email || '',
+              displayName: u.displayName || u.email?.split('@')[0] || 'Learner',
+              photoURL: u.photoURL || '',
               createdAt: serverTimestamp()
             };
             await setDoc(userRef, newProfile);
@@ -81,12 +89,12 @@ export default function App() {
             setUserProfile(userSnap.data() as UserProfile);
           }
         } catch (error) {
-          handleFirestoreError(error, OperationType.WRITE, `users/${user.uid}`);
+          handleFirestoreError(error, OperationType.WRITE, `users/${targetUid}`);
         }
       } else {
         setUserProfile(null);
       }
-      setUser(user);
+      setUser(u);
       setLoading(false);
     });
     return () => {
@@ -103,27 +111,78 @@ export default function App() {
     }
   };
 
+  const handleCredentialsAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!username.trim() || !password.trim()) {
+      setErrorMsg("Please fill in all fields.");
+      return;
+    }
+    setErrorMsg("");
+    setLoadingAuth(true);
+
+    const cleanUsername = username.trim().toLowerCase();
+    const email = cleanUsername === 'nerxds' ? 'nerxds@gmail.com' : `${cleanUsername}@lexigrow.com`;
+
+    try {
+      if (authMode === 'signin') {
+        try {
+          await signInWithEmailAndPassword(auth, email, password);
+        } catch (error: any) {
+          // Auto-register requested admin if not yet registered in Auth
+          if (cleanUsername === 'nerxds' && password === 'lexigrow2005' && (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential')) {
+            try {
+              await createUserWithEmailAndPassword(auth, email, password);
+              return;
+            } catch (createErr: any) {
+              console.error("Auto registration of requesting credentials failed:", createErr);
+            }
+          }
+          throw error;
+        }
+      } else {
+        await createUserWithEmailAndPassword(auth, email, password);
+      }
+    } catch (error: any) {
+      console.error("Auth error:", error);
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        setErrorMsg("Invalid username or password.");
+      } else if (error.code === 'auth/email-already-in-use') {
+        setErrorMsg("This username is already taken.");
+      } else if (error.code === 'auth/operation-not-allowed') {
+        setErrorMsg("Username/Password auth is not enabled in Firebase. Please enable the 'Email/Password' Provider in the Firebase Web Console under Authentication > Sign-in method.");
+      } else if (error.code === 'auth/weak-password') {
+        setErrorMsg("The password must be at least 6 characters.");
+      } else {
+        setErrorMsg(error.message || "An authentication error occurred.");
+      }
+    } finally {
+      setLoadingAuth(false);
+    }
+  };
+
   const handleSignOut = () => signOut(auth);
 
   const handleSetLevel = async (level: ProficiencyLevel) => {
     if (!user) return;
-    const userRef = doc(db, 'users', user.uid);
+    const targetUid = user.email === 'nerxds@gmail.com' ? 'zpGQputpwlevMIYLN3DrjQWyXi52' : user.uid;
+    const userRef = doc(db, 'users', targetUid);
     try {
       await setDoc(userRef, { level }, { merge: true });
       setUserProfile(prev => prev ? { ...prev, level } : null);
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `users/${user.uid}`);
+      handleFirestoreError(error, OperationType.WRITE, `users/${targetUid}`);
     }
   };
 
   const handleSetLanguage = async (targetLanguage: 'english' | 'german') => {
     if (!user) return;
-    const userRef = doc(db, 'users', user.uid);
+    const targetUid = user.email === 'nerxds@gmail.com' ? 'zpGQputpwlevMIYLN3DrjQWyXi52' : user.uid;
+    const userRef = doc(db, 'users', targetUid);
     try {
       await setDoc(userRef, { targetLanguage }, { merge: true });
       setUserProfile(prev => prev ? { ...prev, targetLanguage } : null);
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `users/${user.uid}`);
+      handleFirestoreError(error, OperationType.WRITE, `users/${targetUid}`);
     }
   };
 
@@ -179,14 +238,78 @@ export default function App() {
             initial={{y: 20, opacity: 0}}
             animate={{y: 0, opacity: 1}}
             transition={{delay: 0.2}}
-            className="mt-16"
+            className="mt-16 max-w-md mx-auto"
           >
-            <button
-              onClick={handleSignIn}
-              className="bg-ink text-paper px-12 py-5 font-bold uppercase tracking-[0.2em] text-xs hover:opacity-90 transition-all active:scale-95"
-            >
-              Sign up with Google
-            </button>
+            <div className="bg-white border border-ink p-8 text-left space-y-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+              <div className="flex border-b border-ink/10 pb-4 justify-between items-center">
+                <span className="text-xs uppercase font-bold tracking-[0.2em] opacity-60">
+                  {authMode === 'signin' ? 'Sign In' : 'Create Account'}
+                </span>
+                <button 
+                  onClick={() => {
+                    setAuthMode(authMode === 'signin' ? 'register' : 'signin');
+                    setErrorMsg('');
+                  }}
+                  className="text-[10px] uppercase font-bold tracking-[0.2em] underline opacity-40 hover:opacity-100 cursor-pointer"
+                >
+                  {authMode === 'signin' ? 'Register instead' : 'Sign in instead'}
+                </button>
+              </div>
+
+              {errorMsg && (
+                <div className="p-3 bg-red-50 border border-red-500/20 text-red-600 text-xs font-medium">
+                  {errorMsg}
+                </div>
+              )}
+
+              <form onSubmit={handleCredentialsAuth} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-bold tracking-[0.2em] opacity-40 block">Username</label>
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="E.g. nerxds"
+                    className="w-full px-4 py-3 bg-transparent border border-ink/20 focus:border-ink outline-none transition-all text-sm font-sans"
+                    disabled={loadingAuth}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-bold tracking-[0.2em] opacity-40 block">Password</label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-4 py-3 bg-transparent border border-ink/20 focus:border-ink outline-none transition-all text-sm font-sans"
+                    disabled={loadingAuth}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loadingAuth}
+                  className="w-full bg-ink text-paper py-4 font-bold uppercase tracking-[0.2em] text-[10px] hover:opacity-90 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-55"
+                >
+                  {loadingAuth ? 'Processing...' : authMode === 'signin' ? 'Access App' : 'Register Account'}
+                </button>
+              </form>
+
+              <div className="relative flex py-2 items-center">
+                <div className="flex-grow border-t border-ink/10"></div>
+                <span className="flex-shrink mx-4 text-[9px] uppercase font-bold tracking-[0.2em] opacity-30">or</span>
+                <div className="flex-grow border-t border-ink/10"></div>
+              </div>
+
+              <button
+                onClick={handleSignIn}
+                className="w-full border border-ink py-4 font-bold uppercase tracking-[0.2em] hover:bg-ink hover:text-paper transition-all text-[10px] flex items-center justify-center gap-2 cursor-pointer"
+              >
+                Sign In with Google
+              </button>
+            </div>
+            
             <p className="mt-8 text-ink/30 text-[10px] font-bold uppercase tracking-[0.2em]">50,000+ words mastered this week</p>
           </motion.div>
           
