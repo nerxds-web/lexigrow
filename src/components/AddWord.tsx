@@ -18,6 +18,7 @@ export function AddWord({targetLanguage, onWordAdded}: AddWordProps) {
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<GeminiWordResult | null>(null);
   const [selectedArticle, setSelectedArticle] = useState<'der' | 'die' | 'das' | null>(null);
+  const [lookupError, setLookupError] = useState<string | null>(null);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,13 +27,20 @@ export function AddWord({targetLanguage, onWordAdded}: AddWordProps) {
     setLoading(true);
     setPreview(null);
     setSelectedArticle(null);
+    setLookupError(null);
     try {
       const result = await lookupWord(wordInput, targetLanguage);
       // Ensure local language field is set
       result.language = targetLanguage;
       setPreview(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Search failed:", error);
+      let errorMsg = "Lookup failed. Please verify your internet connection and try again.";
+      const errorString = String(error?.message || "") + JSON.stringify(error || "");
+      if (errorString.includes("429") || errorString.toLowerCase().includes("quota") || errorString.toLowerCase().includes("limit")) {
+        errorMsg = "Your daily Gemini free-tier quota (20 requests/day) has been reached. Please check back later or upgrade your key in Settings.";
+      }
+      setLookupError(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -48,6 +56,7 @@ export function AddWord({targetLanguage, onWordAdded}: AddWordProps) {
       setWordInput('');
       setPreview(null);
       setSelectedArticle(null);
+      setLookupError(null);
       onWordAdded();
     } catch (error) {
       console.error("Save failed:", error);
@@ -83,6 +92,13 @@ export function AddWord({targetLanguage, onWordAdded}: AddWordProps) {
           <span>Lookup</span>
         </button>
       </form>
+
+      {lookupError && (
+        <div className="border border-rose-500/10 bg-rose-500/[0.02] p-4 text-xs leading-relaxed text-rose-950/80 max-w-4xl animate-in fade-in duration-200">
+          <p className="font-bold uppercase tracking-wider text-[9px] text-rose-700 font-mono mb-1">Lookup Exception</p>
+          <p>{lookupError}</p>
+        </div>
+      )}
 
       {preview && (
         <div className="bg-white border border-ink p-12 relative overflow-hidden group animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-4xl">

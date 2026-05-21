@@ -1,6 +1,7 @@
 import React, {useState, useEffect} from 'react';
 import {UserProfile, ProficiencyLevel, GeminiWordResult} from '../types';
 import {getDailyWords} from '../lib/gemini';
+import {getFallbackWords} from '../lib/fallbacks';
 import {db, handleFirestoreError, OperationType} from '../lib/firebase';
 import {doc, setDoc, serverTimestamp} from 'firebase/firestore';
 import {Loader2, Check, Plus, X, Sparkles, ChevronRight, Volume2, Globe} from 'lucide-react';
@@ -19,11 +20,13 @@ interface DailyDiscoveryProps {
 export function DailyDiscovery({userProfile, onLevelSet, onLanguageSet, onWordAdded}: DailyDiscoveryProps) {
   const [loading, setLoading] = useState(false);
   const [words, setWords] = useState<GeminiWordResult[]>(userProfile.dailyWords || []);
+  const [isUsingFallback, setIsUsingFallback] = useState(false);
 
   const currentLanguage = userProfile.targetLanguage || 'english';
 
   const fetchNewBatch = async (level: ProficiencyLevel, lang: 'english' | 'german' = currentLanguage) => {
     setLoading(true);
+    setIsUsingFallback(false);
     try {
       const dailyWords = await getDailyWords(level, lang);
       // Ensure language is set for each word
@@ -43,7 +46,20 @@ export function DailyDiscovery({userProfile, onLevelSet, onLanguageSet, onWordAd
       }
       setWords(updatedDailyWords);
     } catch (error) {
-      console.error("Discovery error:", error);
+      console.warn("Discovery error: Active Gemini API Quota reached. Activating Curated Local Offline Stream.", error);
+      setIsUsingFallback(true);
+      
+      const fallbackWords = getFallbackWords(level, lang);
+      const userRef = doc(db, 'users', userProfile.uid);
+      try {
+        await setDoc(userRef, {
+          dailyWords: fallbackWords,
+          lastDailyUpdate: serverTimestamp()
+        }, { merge: true });
+      } catch (fError) {
+        console.error("Failed to persist fallback words to Firestore:", fError);
+      }
+      setWords(fallbackWords);
     } finally {
       setLoading(false);
     }
@@ -233,6 +249,18 @@ export function DailyDiscovery({userProfile, onLevelSet, onLanguageSet, onWordAd
           </div>
         </div>
       </header>
+
+      {isUsingFallback && (
+        <div className="border border-amber-600/20 bg-amber-600/[0.02] p-4 flex gap-3 text-xs leading-relaxed text-ink/70 animate-in fade-in duration-300">
+          <Sparkles className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <p className="font-bold uppercase tracking-wider text-[9px] text-amber-700 font-mono">Quota Exceeded / Curated Local Stream Activated</p>
+            <p>
+              Your daily Gemini free-tier API quota limit (20 requests/day) has been reached. We have seamlessly switched to Lexigrow's highly refined, <b>curated local stream</b> of high-impact vocabulary for your active level (<b>{userProfile.level}</b>) so your learning flows uninterrupted!
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <AnimatePresence mode="popLayout">
