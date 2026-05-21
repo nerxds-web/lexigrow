@@ -1,0 +1,52 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "level": { "type": "string", "enum": ["A1", "A2", "B1", "B2", "C1", "C2"] },
+        "targetLanguage": { "type": "string", "enum": ["english", "german"] },
+        "lastDailyUpdate": { "type": "string", "format": "date-time" },
+        "dailyWords": { "type": "array" }
+      },
+      "required": ["uid", "email", "createdAt"]
+    },
+    "Word": {
+      "title": "Word",
+      "description": "A vocabulary word for the user to learn",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "word": { "type": "string" },
+        "meaningEn": { "type": "string" },
+        "meaningAr": { "type": "string" },
+        "example": { "type": "string" },
+        "lastReviewed": { "type": "string", "format": "date-time" },
+        "nextReview": { "type": "string", "format": "date-time" },
+        "interval": { "type": "number", "description": "Current interval in days" },
+        "easeFactor": { "type": "number", "description": "Ease factor for SRS (default 2.5)" },
+        "status": { "type": "string", "enum": ["learning", "reviewing", "mastered"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "language": { "type": "string", "enum": ["english", "german"] },
+        "genderArticle": { "type": "string", "enum": ["der", "die", "das", ""] }
+      },
+      "required": ["userId", "word", "meaningEn", "meaningAr", "example", "nextReview", "interval", "easeFactor", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Public user profile information"
+    },
+    "/users/{userId}/vocabulary/{wordId}": {
+      "schema": "Word",
+      "description": "User's individual vocabulary words"
+    }
+  }
+}

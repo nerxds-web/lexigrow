@@ -1,0 +1,112 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Entity Validations ---
+
+    function isValidUser(data) {
+      let requiredFields = ['uid', 'email', 'displayName', 'photoURL', 'createdAt'];
+      
+      return data.keys().hasAll(requiredFields) &&
+             data.uid == request.auth.uid &&
+             data.email is string && data.email.size() <= 512 &&
+             data.displayName is string && data.displayName.size() <= 256 &&
+             data.photoURL is string && data.photoURL.size() <= 2048 &&
+             data.createdAt is timestamp &&
+             (!('level' in data) || data.level in ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']) &&
+             (!('targetLanguage' in data) || data.targetLanguage in ['english', 'german']) &&
+             (!('lastDailyUpdate' in data) || data.lastDailyUpdate is timestamp) &&
+             (!('dailyWords' in data) || data.dailyWords is list);
+    }
+
+    function isValidWord(data) {
+      let requiredFields = ['userId', 'word', 'meaningEn', 'meaningAr', 'example', 'nextReview', 'interval', 'easeFactor', 'status', 'createdAt'];
+      return data.keys().hasAll(requiredFields) &&
+             data.userId == request.auth.uid &&
+             data.word is string && data.word.size() > 0 && data.word.size() <= 100 &&
+             data.meaningEn is string && data.meaningEn.size() <= 1000 &&
+             data.meaningAr is string && data.meaningAr.size() <= 1000 &&
+             data.example is string && data.example.size() <= 2000 &&
+             (!('exampleAr' in data) || data.exampleAr is string) &&
+             (!('partOfSpeech' in data) || data.partOfSpeech is string) &&
+             (!('ipa' in data) || data.ipa is string) &&
+             (!('language' in data) || data.language in ['english', 'german']) &&
+             (!('genderArticle' in data) || data.genderArticle in ['der', 'die', 'das', '']) &&
+             data.interval is number &&
+             data.easeFactor is number &&
+             data.status in ['learning', 'reviewing', 'mastered'] &&
+             data.createdAt is timestamp &&
+             data.nextReview is timestamp;
+    }
+
+    // --- Match Blocks ---
+
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && resource.data.uid == request.auth.uid;
+      
+      allow create: if isOwner(userId) && isValidUser(incoming()) && incoming().createdAt == request.time;
+      
+      allow update: if isOwner(userId) && isVerified() &&
+                    isValidUser(incoming()) &&
+                    incoming().uid == existing().uid &&
+                    incoming().createdAt == existing().createdAt && (
+                      // Allow updating profile or discovery state
+                      incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'level', 'lastDailyUpdate', 'dailyWords', 'targetLanguage'])
+                    );
+      
+      allow delete: if isOwner(userId);
+
+      // Vocabulary subcollection
+      match /vocabulary/{wordId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        
+        allow create: if isOwner(userId) && isVerified() && 
+                      isValidId(wordId) && isValidWord(incoming()) &&
+                      incoming().createdAt == request.time;
+        
+        allow update: if isOwner(userId) && isVerified() && 
+                      isValidWord(incoming()) &&
+                      incoming().userId == existing().userId &&
+                      incoming().createdAt == existing().createdAt && (
+                        // Action: Update Review Stats (SRS)
+                        (incoming().diff(existing()).affectedKeys().hasOnly(['lastReviewed', 'nextReview', 'interval', 'easeFactor', 'status'])) ||
+                        // Action: Edit Content
+                        (incoming().diff(existing()).affectedKeys().hasOnly(['word', 'meaningEn', 'meaningAr', 'example', 'partOfSpeech', 'ipa', 'exampleAr', 'language', 'genderArticle']))
+                      );
+        
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}
