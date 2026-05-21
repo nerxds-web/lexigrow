@@ -86,7 +86,7 @@ export function ReviseToday({ dueWords, loading, onStartReview }: ReviseTodayPro
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        playPronunciation(word.word, word.language === 'german');
+                        playPronunciation(word.word);
                       }}
                       className="p-1.5 bg-ink/5 hover:bg-ink hover:text-paper rounded-full transition-all cursor-pointer relative z-10"
                       title="Speak Pronunciation"
