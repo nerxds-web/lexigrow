@@ -104,10 +104,20 @@ export default function App() {
   }, []);
 
   const handleSignIn = async () => {
+    setErrorMsg("");
     try {
       await signInWithPopup(auth, googleProvider);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Sign in failed:", error);
+      if (error?.code === 'auth/unauthorized-domain') {
+        setErrorMsg("Authorized Domain Error: Your Vercel domain is not authorized in Firebase. Please add your Vercel URL to the 'Authorized Domains' list in Firebase Console > Authentication > Settings.");
+      } else if (error?.code === 'auth/popup-closed-by-user') {
+        setErrorMsg("The sign-in popup was closed before completion. Please try again.");
+      } else if (error?.code === 'auth/popup-blocked') {
+        setErrorMsg("The sign-in popup was blocked by your browser. Please enable popups or try the Username / Password sign-in below.");
+      } else {
+        setErrorMsg(error?.message || "Google sign-in could not be completed. You can use Username / Password login as a fallback!");
+      }
     }
   };
 
