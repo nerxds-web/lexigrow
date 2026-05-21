@@ -12,11 +12,11 @@ service cloud.firestore {
     }
 
     function isOwner(userId) {
-      return isSignedIn() && (request.auth.uid == userId || (userId == 'zpGQputpwlevMIYLN3DrjQWyXi52' && request.auth.token.email == 'nerxds@gmail.com'));
+      return isSignedIn() && (request.auth.uid == userId || (userId == 'zpGQputpwlevMIYLN3DrjQWyXi52' && (request.auth.token.email == 'nerxds@gmail.com' || request.auth.token.email == 'nerxds@lexigrow.com')));
     }
 
     function isVerified() {
-      return isSignedIn() && (request.auth.token.email_verified == true || request.auth.token.email == 'nerxds@gmail.com');
+      return isSignedIn() && (request.auth.token.email_verified == true || request.auth.token.email == 'nerxds@gmail.com' || request.auth.token.email == 'nerxds@lexigrow.com');
     }
 
     function isValidId(id) {
@@ -37,7 +37,7 @@ service cloud.firestore {
       let requiredFields = ['uid', 'email', 'displayName', 'photoURL', 'createdAt'];
       
       return data.keys().hasAll(requiredFields) &&
-             data.uid == request.auth.uid &&
+             (data.uid == request.auth.uid || (data.uid == 'zpGQputpwlevMIYLN3DrjQWyXi52' && (request.auth.token.email == 'nerxds@gmail.com' || request.auth.token.email == 'nerxds@lexigrow.com'))) &&
              data.email is string && data.email.size() <= 512 &&
              data.displayName is string && data.displayName.size() <= 256 &&
              data.photoURL is string && data.photoURL.size() <= 2048 &&
@@ -51,7 +51,7 @@ service cloud.firestore {
     function isValidWord(data) {
       let requiredFields = ['userId', 'word', 'meaningEn', 'meaningAr', 'example', 'nextReview', 'interval', 'easeFactor', 'status', 'createdAt'];
       return data.keys().hasAll(requiredFields) &&
-             data.userId == request.auth.uid &&
+             (data.userId == request.auth.uid || (data.userId == 'zpGQputpwlevMIYLN3DrjQWyXi52' && (request.auth.token.email == 'nerxds@gmail.com' || request.auth.token.email == 'nerxds@lexigrow.com'))) &&
              data.word is string && data.word.size() > 0 && data.word.size() <= 100 &&
              data.meaningEn is string && data.meaningEn.size() <= 1000 &&
              data.meaningAr is string && data.meaningAr.size() <= 1000 &&
@@ -72,7 +72,7 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow get: if isSignedIn();
-      allow list: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow list: if isSignedIn() && (resource.data.uid == request.auth.uid || (resource.data.uid == 'zpGQputpwlevMIYLN3DrjQWyXi52' && (request.auth.token.email == 'nerxds@gmail.com' || request.auth.token.email == 'nerxds@lexigrow.com')));
       
       allow create: if isOwner(userId) && isValidUser(incoming()) && incoming().createdAt == request.time;
       

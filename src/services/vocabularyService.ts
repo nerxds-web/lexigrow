@@ -10,8 +10,8 @@ export async function addWordToCollection(userId: string, wordData: GeminiWordRe
       throw new Error("User profile not found.");
     }
 
+    // Set nextReview of newly added words to be due immediately (today)
     const nextReview = new Date();
-    nextReview.setDate(nextReview.getDate() + 1);
 
     await addDoc(collection(db, path), {
       userId,

@@ -32,7 +32,7 @@ interface FirestoreErrorInfo {
 export function getEffectiveUid(): string | null {
   const user = auth.currentUser;
   if (!user) return null;
-  if (user.email === 'nerxds@gmail.com') {
+  if (user.email === 'nerxds@gmail.com' || user.email === 'nerxds@lexigrow.com') {
     return 'zpGQputpwlevMIYLN3DrjQWyXi52';
   }
   return user.uid;

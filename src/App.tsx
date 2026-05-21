@@ -35,7 +35,7 @@ export default function App() {
       return;
     }
 
-    const userId = user.email === 'nerxds@gmail.com' ? 'zpGQputpwlevMIYLN3DrjQWyXi52' : user.uid;
+    const userId = (user.email === 'nerxds@gmail.com' || user.email === 'nerxds@lexigrow.com') ? 'zpGQputpwlevMIYLN3DrjQWyXi52' : user.uid;
     const q = query(
       collection(db, `users/${userId}/vocabulary`),
       orderBy('createdAt', 'desc')
@@ -56,9 +56,15 @@ export default function App() {
   }, [user]);
 
   const dueWords = words.filter(w => {
+    const activeLanguage = userProfile?.targetLanguage || 'english';
+    const wordLang = w.language || 'english';
+    if (wordLang !== activeLanguage) return false;
+
     if (!w.nextReview) return true;
-    const nextDate = w.nextReview.toDate();
-    return nextDate <= new Date();
+    const nextDate = typeof w.nextReview.toDate === 'function' ? w.nextReview.toDate() : new Date(w.nextReview);
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+    return nextDate <= endOfToday;
   });
 
   useEffect(() => {
@@ -71,7 +77,7 @@ export default function App() {
       clearTimeout(safetyTimer);
       if (u) {
         // Ensure user profile exists in Firestore
-        const targetUid = u.email === 'nerxds@gmail.com' ? 'zpGQputpwlevMIYLN3DrjQWyXi52' : u.uid;
+        const targetUid = (u.email === 'nerxds@gmail.com' || u.email === 'nerxds@lexigrow.com') ? 'zpGQputpwlevMIYLN3DrjQWyXi52' : u.uid;
         const userRef = doc(db, 'users', targetUid);
         try {
           const userSnap = await getDoc(userRef);
@@ -131,7 +137,7 @@ export default function App() {
     setLoadingAuth(true);
 
     const cleanUsername = username.trim().toLowerCase();
-    const email = cleanUsername === 'nerxds' ? 'nerxds@gmail.com' : `${cleanUsername}@lexigrow.com`;
+    const email = `${cleanUsername}@lexigrow.com`;
 
     try {
       if (authMode === 'signin') {
@@ -174,7 +180,7 @@ export default function App() {
 
   const handleSetLevel = async (level: ProficiencyLevel) => {
     if (!user) return;
-    const targetUid = user.email === 'nerxds@gmail.com' ? 'zpGQputpwlevMIYLN3DrjQWyXi52' : user.uid;
+    const targetUid = (user.email === 'nerxds@gmail.com' || user.email === 'nerxds@lexigrow.com') ? 'zpGQputpwlevMIYLN3DrjQWyXi52' : user.uid;
     const userRef = doc(db, 'users', targetUid);
     try {
       await setDoc(userRef, { level }, { merge: true });
@@ -186,7 +192,7 @@ export default function App() {
 
   const handleSetLanguage = async (targetLanguage: 'english' | 'german') => {
     if (!user) return;
-    const targetUid = user.email === 'nerxds@gmail.com' ? 'zpGQputpwlevMIYLN3DrjQWyXi52' : user.uid;
+    const targetUid = (user.email === 'nerxds@gmail.com' || user.email === 'nerxds@lexigrow.com') ? 'zpGQputpwlevMIYLN3DrjQWyXi52' : user.uid;
     const userRef = doc(db, 'users', targetUid);
     try {
       await setDoc(userRef, { targetLanguage }, { merge: true });
@@ -462,6 +468,7 @@ export default function App() {
                 <ReviewList 
                   words={words} 
                   loading={wordsLoading} 
+                  targetLanguage={(userProfile?.targetLanguage as 'english' | 'german') || 'english'}
                   onStartReview={(selectedWords) => setReviewingWords(selectedWords)} 
                 />
               </section>

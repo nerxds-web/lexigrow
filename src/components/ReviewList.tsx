@@ -9,9 +9,10 @@ interface ReviewListProps {
   onStartReview: (words: VocabularyWord[]) => void;
   words?: VocabularyWord[];
   loading?: boolean;
+  targetLanguage?: 'english' | 'german';
 }
 
-export function ReviewList({ onStartReview, words: propWords, loading: propLoading }: ReviewListProps) {
+export function ReviewList({ onStartReview, words: propWords, loading: propLoading, targetLanguage }: ReviewListProps) {
   const [localWords, setLocalWords] = useState<VocabularyWord[]>([]);
   const [localLoading, setLocalLoading] = useState(true);
 
@@ -42,16 +43,21 @@ export function ReviewList({ onStartReview, words: propWords, loading: propLoadi
   const words = propWords !== undefined ? propWords : localWords;
   const loading = propLoading !== undefined ? propLoading : localLoading;
 
-  const dueWords = words.filter(w => {
+  const activeLanguage = targetLanguage || 'english';
+  const languageWords = words.filter(w => (w.language || 'english') === activeLanguage);
+
+  const dueWords = languageWords.filter(w => {
     if (!w.nextReview) return true;
-    const nextDate = w.nextReview.toDate();
-    return nextDate <= new Date();
+    const nextDate = typeof w.nextReview.toDate === 'function' ? w.nextReview.toDate() : new Date(w.nextReview);
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+    return nextDate <= endOfToday;
   });
 
   const [viewAll, setViewAll] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredWords = words.filter(w => 
+  const filteredWords = languageWords.filter(w => 
     w.word.toLowerCase().includes(searchTerm.toLowerCase()) ||
     w.meaningAr.toLowerCase().includes(searchTerm.toLowerCase()) ||
     w.meaningEn.toLowerCase().includes(searchTerm.toLowerCase())
@@ -72,7 +78,7 @@ export function ReviewList({ onStartReview, words: propWords, loading: propLoadi
         <div className="border-b md:border-b-0 md:border-r border-ink pb-8 md:pb-0 pr-8">
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-40 mb-4">Total Lexicon</p>
           <div className="flex items-baseline gap-2">
-            <span className="text-6xl font-serif italic">{words.length}</span>
+            <span className="text-6xl font-serif italic">{languageWords.length}</span>
             <span className="text-xs uppercase font-bold opacity-30">entries</span>
           </div>
         </div>
@@ -86,7 +92,7 @@ export function ReviewList({ onStartReview, words: propWords, loading: propLoadi
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-40 mb-4">Mastery Rate</p>
           <div className="flex items-baseline gap-2">
-            <span className="text-6xl font-serif italic">{words.length ? Math.round((words.filter(w => w.status === 'mastered').length / words.length) * 100) : 0}%</span>
+            <span className="text-6xl font-serif italic">{languageWords.length ? Math.round((languageWords.filter(w => w.status === 'mastered').length / languageWords.length) * 100) : 0}%</span>
             <span className="text-xs uppercase font-bold opacity-30">recall</span>
           </div>
         </div>
@@ -109,7 +115,7 @@ export function ReviewList({ onStartReview, words: propWords, loading: propLoadi
                Initialize Study <ChevronRight className="w-4 h-4" />
              </button>
           </div>
-        ) : words.length > 0 && (
+        ) : languageWords.length > 0 && (
           <div className="flex-1 border border-ink/20 p-12 flex flex-col justify-between gap-8 group">
              <div className="space-y-4">
                <span className="text-[10px] font-bold uppercase tracking-[0.4em] opacity-50">On-Demand Practise</span>
@@ -119,7 +125,7 @@ export function ReviewList({ onStartReview, words: propWords, loading: propLoadi
                </h2>
              </div>
              <button 
-               onClick={() => onStartReview(words.slice(0, 10))}
+               onClick={() => onStartReview(languageWords.slice(0, 10))}
                className="bg-ink text-paper px-12 py-5 font-bold uppercase tracking-[0.2em] text-xs hover:opacity-90 transition-all flex items-center justify-center gap-4 border border-ink"
              >
                Practice Random 10 <ChevronRight className="w-4 h-4" />
@@ -143,7 +149,7 @@ export function ReviewList({ onStartReview, words: propWords, loading: propLoadi
               onChange={(e) => setSearchTerm(e.target.value)}
               className="bg-transparent border-b border-ink/20 focus:border-ink outline-none text-[10px] uppercase font-bold tracking-widest py-1 flex-1 md:w-48"
             />
-            {words.length > 12 && (
+            {languageWords.length > 12 && (
               <button 
                 onClick={() => setViewAll(!viewAll)}
                 className="text-[10px] font-bold uppercase tracking-widest border border-ink px-4 py-1 hover:bg-ink hover:text-paper transition-all whitespace-nowrap"
@@ -214,13 +220,13 @@ export function ReviewList({ onStartReview, words: propWords, loading: propLoadi
                 </div>
                 
                 <div className="mt-8 pt-8 border-t border-ink/5 group-hover:border-paper/10 text-[9px] uppercase font-bold tracking-widest opacity-30 group-hover:text-paper transition-all flex justify-between items-center">
-                  <span>NEXT / {word.nextReview?.toDate().toLocaleDateString()}</span>
+                  <span>NEXT / {word.nextReview ? (typeof word.nextReview.toDate === 'function' ? word.nextReview.toDate() : new Date(word.nextReview)).toLocaleDateString() : 'Instant'}</span>
                   <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
               </div>
             );
           })}
-          {words.length === 0 && (
+          {languageWords.length === 0 && (
             <div className="col-span-full py-32 text-center bg-paper">
               <span className="text-[10px] font-bold uppercase tracking-[0.4em] opacity-20 block mb-4">Empty Library</span>
               <p className="text-2xl font-serif italic text-ink/40">No entries have been indexed yet.</p>
