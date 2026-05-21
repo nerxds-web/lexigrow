@@ -19,7 +19,17 @@ export default function App() {
   const [reviewingWords, setReviewingWords] = useState<VocabularyWord[] | null>(null);
   const [words, setWords] = useState<VocabularyWord[]>([]);
   const [wordsLoading, setWordsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'lexicon' | 'review'>('lexicon');
+  const [activeTab, setActiveTab] = useState<'lexicon' | 'review' | 'settings'>('lexicon');
+
+  const activeLanguage = userProfile?.targetLanguage || 'english';
+  const activeLevel = activeLanguage === 'german'
+    ? (userProfile?.germanLevel || userProfile?.level || 'A1')
+    : (userProfile?.englishLevel || userProfile?.level || 'B2');
+
+  const resolvedUserProfile = userProfile ? {
+    ...userProfile,
+    level: activeLevel
+  } : null;
 
   // Credentials login states
   const [authMode, setAuthMode] = useState<'signin' | 'register'>('signin');
@@ -178,16 +188,33 @@ export default function App() {
 
   const handleSignOut = () => signOut(auth);
 
-  const handleSetLevel = async (level: ProficiencyLevel) => {
+  const handleSetLevelForLanguage = async (lang: 'english' | 'german', level: ProficiencyLevel) => {
     if (!user) return;
     const targetUid = (user.email === 'nerxds@gmail.com' || user.email === 'nerxds@lexigrow.com') ? 'zpGQputpwlevMIYLN3DrjQWyXi52' : user.uid;
     const userRef = doc(db, 'users', targetUid);
+
+    const updateObj: any = {};
+    if (lang === 'german') {
+      updateObj.germanLevel = level;
+    } else {
+      updateObj.englishLevel = level;
+    }
+
+    // Also update generic level for active language for backward compatibility
+    if (lang === activeLanguage) {
+      updateObj.level = level;
+    }
+
     try {
-      await setDoc(userRef, { level }, { merge: true });
-      setUserProfile(prev => prev ? { ...prev, level } : null);
+      await setDoc(userRef, updateObj, { merge: true });
+      setUserProfile(prev => prev ? { ...prev, ...updateObj } : null);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `users/${targetUid}`);
     }
+  };
+
+  const handleSetLevel = async (level: ProficiencyLevel) => {
+    await handleSetLevelForLanguage(activeLanguage, level);
   };
 
   const handleSetLanguage = async (targetLanguage: 'english' | 'german') => {
@@ -350,16 +377,16 @@ export default function App() {
   return (
     <div className="min-h-screen bg-paper flex flex-col font-sans text-ink selection:bg-ink selection:text-paper">
       <nav className="bg-paper border-b border-ink sticky top-0 z-40 w-full shrink-0">
-        <div className="max-w-7xl mx-auto px-8 h-20 flex justify-between items-center">
-          <div className="flex items-center gap-12">
-            <span className="text-2xl font-serif font-bold tracking-tighter">LEXIGROW.</span>
-            <div className="hidden lg:flex gap-8 text-[10px] uppercase font-bold tracking-[0.2em]">
+        <div className="max-w-7xl mx-auto px-6 sm:px-8 h-20 flex justify-between items-center gap-4">
+          <div className="flex items-center justify-between sm:justify-start gap-6 sm:gap-12 w-full">
+            <span className="text-xl sm:text-2xl font-serif font-bold tracking-tighter">LEXIGROW.</span>
+            <div className="flex gap-4 sm:gap-8 text-[10px] uppercase font-bold tracking-[0.15em] sm:tracking-[0.2em]">
               <button 
                 onClick={() => setActiveTab('lexicon')}
                 className={`transition-all pb-1 cursor-pointer font-bold ${
                   activeTab === 'lexicon' 
                     ? 'text-ink opacity-100 border-b border-ink' 
-                    : 'opacity-40 hover:opacity-100'
+                    : 'opacity-45 hover:opacity-100'
                 }`}
               >
                 Lexicon
@@ -369,7 +396,7 @@ export default function App() {
                 className={`transition-all pb-1 cursor-pointer font-bold flex items-center gap-1.5 ${
                   activeTab === 'review' 
                     ? 'text-ink opacity-100 border-b border-ink' 
-                    : 'opacity-40 hover:opacity-100'
+                    : 'opacity-45 hover:opacity-100'
                 }`}
               >
                 Review
@@ -380,26 +407,16 @@ export default function App() {
                 )}
               </button>
               <button
-                onClick={() => {}} 
-                disabled
-                className="opacity-25 cursor-not-allowed font-bold"
+                onClick={() => setActiveTab('settings')} 
+                className={`transition-all pb-1 cursor-pointer font-bold ${
+                  activeTab === 'settings' 
+                    ? 'text-ink opacity-100 border-b border-ink' 
+                    : 'opacity-45 hover:opacity-100'
+                }`}
               >
                 Settings
               </button>
             </div>
-          </div>
-          
-          <div className="flex items-center gap-6">
-            <div className="flex flex-col items-end pr-4 border-r border-ink/20">
-              <span className="text-xs font-bold">{user.displayName}</span>
-              <span className="text-[10px] uppercase font-bold opacity-30 tracking-widest">{user.email}</span>
-            </div>
-            <button
-              onClick={handleSignOut}
-              className="text-[10px] uppercase font-bold tracking-[0.2em] border border-ink px-4 py-2 hover:bg-ink hover:text-paper transition-all"
-            >
-              Sign Out
-            </button>
           </div>
         </div>
       </nav>
@@ -414,13 +431,13 @@ export default function App() {
            </div>
         </aside>
 
-        <main className="flex-1 px-8 py-12 space-y-24">
-          {activeTab === 'lexicon' ? (
+        <main className="flex-1 px-6 sm:px-8 py-12 space-y-24">
+          {activeTab === 'lexicon' && (
             <>
-              {userProfile && (
+              {resolvedUserProfile && (
                 <section>
                   <DailyDiscovery 
-                    userProfile={userProfile} 
+                    userProfile={resolvedUserProfile} 
                     onLevelSet={handleSetLevel} 
                     onLanguageSet={handleSetLanguage}
                     onWordAdded={() => {}} 
@@ -432,23 +449,25 @@ export default function App() {
                 <header className="flex items-baseline justify-between border-b border-ink/10 pb-4">
                   <div className="space-y-1">
                     <span className="text-[10px] font-bold uppercase tracking-[0.3em] opacity-40">Add New Entry</span>
-                    <h2 className="text-5xl font-serif font-bold tracking-tighter">Intelligence.</h2>
+                    <h2 className="text-4xl sm:text-5xl font-serif font-bold tracking-tighter">Intelligence.</h2>
                   </div>
                 </header>
                 <AddWord 
-                  targetLanguage={(userProfile?.targetLanguage as 'english' | 'german') || 'english'}
+                  targetLanguage={(resolvedUserProfile?.targetLanguage as 'english' | 'german') || 'english'}
                   onWordAdded={() => {}} 
                 />
               </section>
             </>
-          ) : (
+          )}
+
+          {activeTab === 'review' && (
             <>
               {/* Revision list today */}
               <section className="space-y-8">
                 <header className="flex items-baseline justify-between border-b border-ink/10 pb-4">
                   <div className="space-y-1">
                     <span className="text-[10px] font-bold uppercase tracking-[0.3em] opacity-40">Priority Revision // Today</span>
-                    <h2 className="text-5xl font-serif font-bold tracking-tighter">Revise Today.</h2>
+                    <h2 className="text-4xl sm:text-5xl font-serif font-bold tracking-tighter">Revise Today.</h2>
                   </div>
                 </header>
                 <ReviseToday 
@@ -462,17 +481,132 @@ export default function App() {
                 <header className="flex items-baseline justify-between border-b border-ink/10 pb-4">
                   <div className="space-y-1">
                     <span className="text-[10px] font-bold uppercase tracking-[0.3em] opacity-40 font-sans">Curation Dashboard</span>
-                    <h2 className="text-5xl font-serif font-bold tracking-tighter">Archive.</h2>
+                    <h2 className="text-4xl sm:text-5xl font-serif font-bold tracking-tighter">Archive.</h2>
                   </div>
                 </header>
                 <ReviewList 
                   words={words} 
                   loading={wordsLoading} 
-                  targetLanguage={(userProfile?.targetLanguage as 'english' | 'german') || 'english'}
+                  targetLanguage={(resolvedUserProfile?.targetLanguage as 'english' | 'german') || 'english'}
                   onStartReview={(selectedWords) => setReviewingWords(selectedWords)} 
                 />
               </section>
             </>
+          )}
+
+          {activeTab === 'settings' && (
+            <div className="space-y-12">
+              <header className="flex items-baseline justify-between border-b border-ink/10 pb-4">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.3em] opacity-40">Application Settings</span>
+                  <h2 className="text-4xl sm:text-5xl font-serif font-bold tracking-tighter">Settings.</h2>
+                </div>
+              </header>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Account card */}
+                <div className="border border-ink/10 p-6 sm:p-8 space-y-6 bg-white hover:shadow-[6px_6px_0px_0px_rgba(28,28,28,1)] transition-all duration-300">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.3em] opacity-40 block">User Account</span>
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-ink text-paper font-serif italic text-xl flex items-center justify-center font-bold">
+                      {user.displayName?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || 'U'}
+                    </div>
+                    <div>
+                      <h3 className="font-serif font-bold text-lg leading-tight">{user.displayName || 'Learner'}</h3>
+                      <p className="text-xs opacity-50 font-mono mt-0.5">{user.email}</p>
+                    </div>
+                  </div>
+                  <div className="pt-6 border-t border-ink/5">
+                    <button
+                      onClick={handleSignOut}
+                      className="w-full bg-ink text-white py-4 font-bold uppercase tracking-[0.2em] text-[10px] hover:bg-red-600 hover:text-white transition-all flex items-center justify-center gap-2 cursor-pointer border border-ink"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Sign Out
+                    </button>
+                  </div>
+                </div>
+
+                {/* Configurations card */}
+                <div className="border border-ink/10 p-6 sm:p-8 space-y-6 bg-white hover:shadow-[6px_6px_0px_0px_rgba(28,28,28,1)] transition-all duration-300">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.3em] opacity-40 block">Course Configurations</span>
+                    <h3 className="text-xl font-serif font-bold italic">Language Targets & Grades</h3>
+                  </div>
+
+                  <div className="space-y-6">
+                    <div>
+                      <label className="text-[10px] uppercase font-bold tracking-[0.2em] opacity-45 block mb-2">Active Study Stream</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button 
+                          onClick={() => handleSetLanguage('english')}
+                          className={`text-[10px] font-bold py-3 border transition-all cursor-pointer flex items-center justify-center gap-2 ${activeLanguage === 'english' ? 'bg-ink text-paper border-ink' : 'border-ink/15 opacity-40 hover:opacity-100'}`}
+                        >
+                          English 🇬🇧 {activeLanguage === 'english' && <span className="w-1.5 h-1.5 bg-green-500 rounded-full inline-block animate-pulse" />}
+                        </button>
+                        <button 
+                          onClick={() => handleSetLanguage('german')}
+                          className={`text-[10px] font-bold py-3 border transition-all cursor-pointer flex items-center justify-center gap-2 ${activeLanguage === 'german' ? 'bg-ink text-paper border-ink' : 'border-ink/15 opacity-40 hover:opacity-100'}`}
+                        >
+                          German 🇩🇪 {activeLanguage === 'german' && <span className="w-1.5 h-1.5 bg-green-500 rounded-full inline-block animate-pulse" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 p-4 border border-ink/5 bg-ink/[1%]">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-xs font-bold font-serif flex items-center gap-1.5">
+                          <span>English Grade</span> 🇬🇧
+                        </span>
+                        <span className="text-[9px] font-mono font-bold bg-ink/5 px-2 py-0.5 rounded uppercase">
+                          Level: {userProfile?.englishLevel || userProfile?.level || 'B2'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-6 gap-1">
+                        {(['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as ProficiencyLevel[]).map(level => {
+                          const isCurrent = (userProfile?.englishLevel || userProfile?.level || 'B2') === level;
+                          return (
+                            <button 
+                              key={level}
+                              onClick={() => handleSetLevelForLanguage('english', level)}
+                              className={`text-[9px] font-bold py-2 border transition-all cursor-pointer text-center ${isCurrent ? 'bg-ink text-paper border-ink' : 'border-ink/10 opacity-40 hover:opacity-100 bg-white'}`}
+                            >
+                              {level}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 p-4 border border-ink/5 bg-ink/[1%]">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-xs font-bold font-serif flex items-center gap-1.5">
+                          <span>German Grade</span> 🇩🇪
+                        </span>
+                        <span className="text-[9px] font-mono font-bold bg-ink/5 px-2 py-0.5 rounded uppercase">
+                          Level: {userProfile?.germanLevel || userProfile?.level || 'A1'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-6 gap-1">
+                        {(['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as ProficiencyLevel[]).map(level => {
+                          const isCurrent = (userProfile?.germanLevel || userProfile?.level || 'A1') === level;
+                          return (
+                            <button 
+                              key={level}
+                              onClick={() => handleSetLevelForLanguage('german', level)}
+                              className={`text-[9px] font-bold py-2 border transition-all cursor-pointer text-center ${isCurrent ? 'bg-ink text-paper border-ink' : 'border-ink/10 opacity-40 hover:opacity-100 bg-white'}`}
+                            >
+                              {level}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
         </main>
 
@@ -482,9 +616,11 @@ export default function App() {
             <div className="space-y-6">
               <div>
                 <span className="text-4xl font-serif italic tracking-tighter leading-none">
-                  {userProfile?.level ? `Grade ${userProfile.level}` : 'P-Level 4'}
+                  {activeLevel ? `Grade ${activeLevel}` : 'P-Level 4'}
                 </span>
-                <p className="text-[10px] uppercase font-bold tracking-widest mt-1 opacity-60">Status Grade</p>
+                <p className="text-[10px] uppercase font-bold tracking-widest mt-1 opacity-60">
+                  {activeLanguage === 'german' ? 'German' : 'English'} Status Grade
+                </p>
               </div>
               <div className="pt-6 border-t border-ink/10">
                 <span className="text-2xl font-serif font-bold tracking-tighter">98.2%</span>
@@ -498,13 +634,13 @@ export default function App() {
              <div className="grid grid-cols-2 gap-2">
                 <button 
                   onClick={() => handleSetLanguage('english')}
-                  className={`text-[10px] font-bold py-2 border transition-all cursor-pointer ${(!userProfile?.targetLanguage || userProfile?.targetLanguage === 'english') ? 'bg-ink text-paper border-ink' : 'border-ink/10 opacity-30 hover:opacity-100'}`}
+                  className={`text-[10px] font-bold py-2 border transition-all cursor-pointer ${activeLanguage === 'english' ? 'bg-ink text-paper border-ink' : 'border-ink/10 opacity-30 hover:opacity-100'}`}
                 >
                   English 🇬🇧
                 </button>
                 <button 
                   onClick={() => handleSetLanguage('german')}
-                  className={`text-[10px] font-bold py-2 border transition-all cursor-pointer ${userProfile?.targetLanguage === 'german' ? 'bg-ink text-paper border-ink' : 'border-ink/10 opacity-30 hover:opacity-100'}`}
+                  className={`text-[10px] font-bold py-2 border transition-all cursor-pointer ${activeLanguage === 'german' ? 'bg-ink text-paper border-ink' : 'border-ink/10 opacity-30 hover:opacity-100'}`}
                 >
                   German 🇩🇪
                 </button>
@@ -512,13 +648,14 @@ export default function App() {
           </div>
 
           <div className="pt-6 border-t border-ink/10">
-             <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-40 mb-4 font-sans">Proficiency Grade</p>
+             <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-40 mb-2 font-sans">Proficiency Grade</p>
+             <p className="text-[9px] opacity-45 mb-3 uppercase tracking-wider font-mono">For {activeLanguage === 'german' ? 'German' : 'English'}:</p>
              <div className="grid grid-cols-3 gap-2">
                 {(['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as ProficiencyLevel[]).map(level => (
                   <button 
                     key={level}
                     onClick={() => handleSetLevel(level)}
-                    className={`text-[10px] font-bold py-2 border transition-all cursor-pointer ${userProfile?.level === level ? 'bg-ink text-paper border-ink' : 'border-ink/10 opacity-30 hover:opacity-100'}`}
+                    className={`text-[10px] font-bold py-2 border transition-all cursor-pointer ${activeLevel === level ? 'bg-ink text-paper border-ink' : 'border-ink/10 opacity-30 hover:opacity-100'}`}
                   >
                     {level}
                   </button>

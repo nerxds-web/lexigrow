@@ -8,6 +8,8 @@ export interface UserProfile {
   photoURL: string;
   createdAt: any; // Firestore Timestamp
   level?: ProficiencyLevel;
+  englishLevel?: ProficiencyLevel;
+  germanLevel?: ProficiencyLevel;
   targetLanguage?: 'english' | 'german';
   lastDailyUpdate?: any; // Firestore Timestamp
   dailyWords?: GeminiWordResult[];

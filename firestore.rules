@@ -43,6 +43,8 @@ service cloud.firestore {
              data.photoURL is string && data.photoURL.size() <= 2048 &&
              data.createdAt is timestamp &&
              (!('level' in data) || data.level in ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']) &&
+             (!('englishLevel' in data) || data.englishLevel in ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']) &&
+             (!('germanLevel' in data) || data.germanLevel in ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']) &&
              (!('targetLanguage' in data) || data.targetLanguage in ['english', 'german']) &&
              (!('lastDailyUpdate' in data) || data.lastDailyUpdate is timestamp) &&
              (!('dailyWords' in data) || data.dailyWords is list);
@@ -81,7 +83,7 @@ service cloud.firestore {
                     incoming().uid == existing().uid &&
                     incoming().createdAt == existing().createdAt && (
                       // Allow updating profile or discovery state
-                      incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'level', 'lastDailyUpdate', 'dailyWords', 'targetLanguage'])
+                      incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'level', 'englishLevel', 'germanLevel', 'lastDailyUpdate', 'dailyWords', 'targetLanguage'])
                     );
       
       allow delete: if isOwner(userId);

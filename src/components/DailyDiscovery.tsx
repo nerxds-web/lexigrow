@@ -234,7 +234,7 @@ export function DailyDiscovery({userProfile, onLevelSet, onLanguageSet, onWordAd
         </div>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-ink border border-ink overflow-hidden">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <AnimatePresence mode="popLayout">
           {words.map((word, idx) => (
             <DiscoveryCard
@@ -275,7 +275,7 @@ function DiscoveryCard({ word, idx, userProfile, onSkip, onAdd }: DiscoveryCardP
       animate={{opacity: 1, y: 0}}
       exit={{opacity: 0, scale: 0.95}}
       transition={{delay: idx * 0.1}}
-      className="bg-paper p-10 flex flex-col justify-between group h-[450px] relative"
+      className="bg-white border border-ink/10 hover:border-ink p-8 flex flex-col justify-between group min-h-[470px] h-auto relative hover:shadow-[6px_6px_0px_0px_rgba(28,28,28,1)] transition-all duration-300"
     >
       <div className="space-y-6">
         <div className="flex justify-between items-start">

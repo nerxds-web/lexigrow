@@ -269,13 +269,13 @@ export function ReviewModal({words, onComplete, onClose}: ReviewModalProps) {
               onClick={() => handleReview(3)}
               className="bg-transparent border border-paper/20 h-24 text-paper uppercase font-bold tracking-[0.2em] text-[10px] hover:bg-paper hover:text-ink transition-all cursor-pointer"
             >
-              Mastered
+              With Effort
             </button>
             <button
               onClick={() => handleReview(5)}
               className="bg-paper text-ink h-24 uppercase font-bold tracking-[0.2em] text-[10px] hover:opacity-90 transition-all cursor-pointer"
             >
-              Easy
+              Mastered
             </button>
           </motion.div>
         )}
